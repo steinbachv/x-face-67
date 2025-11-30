@@ -7,7 +7,7 @@ Developed for **Hack-Jak-Brno 2025**
 ![Graphical_Abstract](docs/hackjakbrno_x-face-67_graphical-abstract.png)
 
 Download presentation:
-[Download Slides (PDF)](https://raw.githubusercontent.com/steinbachv/x-face-67/main/docs/HACK25_na_jedné_vlně.pdf)
+[Download Slides (PDF)](https://raw.githubusercontent.com/steinbachv/x-face-67/main/docs/HACK25_Na_jedné_vlně.pdf)
 
 ## 🚀 Features
 
