@@ -4,6 +4,8 @@ This project is a computer vision application designed to assist in facial rehab
 
 Developed for **Hack-Jak-Brno**.
 
+![Graphical_Abstract](docs/graphical_abstract.png)
+
 ## 🚀 Features
 
 - **Real-time Facial Tracking**: Tracks 478 facial landmarks using MediaPipe.
