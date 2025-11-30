@@ -2,7 +2,7 @@
 
 This project is a computer vision application designed to assist in facial rehabilitation therapy. It utilizes **MediaPipe Face Mesh** for high-precision facial landmark tracking and a **Support Vector Machine (SVM)** classifier to recognize and validate specific facial exercises (grimaces) in real-time.
 
-Developed for **Hack-Jak-Brno 2025**.
+Developed for **Hack-Jak-Brno 2025**
 
 ![Graphical_Abstract](docs/hackjakbrno_x-face-67_graphical-abstract.png)
 
