@@ -4,7 +4,7 @@ This project is a computer vision application designed to assist in facial rehab
 
 Developed for **Hack-Jak-Brno 2025**.
 
-![Graphical_Abstract](docs/graphical_abstract.png)
+![Graphical_Abstract](docs/hackjakbrno_x-face-67_graphical-abstract.png)
 
 ## 🚀 Features
 
