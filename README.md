@@ -6,6 +6,9 @@ Developed for **Hack-Jak-Brno 2025**
 
 ![Graphical_Abstract](docs/hackjakbrno_x-face-67_graphical-abstract.png)
 
+Download presentation:
+[Download Slides (PDF)](https://raw.githubusercontent.com/steinbachv/x-face-67/main/docs/HACK25_na_jedne_vlne.pdf)
+
 ## 🚀 Features
 
 - **Real-time Facial Tracking**: Tracks 478 facial landmarks using MediaPipe.
