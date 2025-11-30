@@ -53,14 +53,14 @@ def load_symetry_points(filename: str = "symetry_points.id") -> list[tuple[str, 
     with open(filename, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            # přeskoč prázdné řádky
             if not line:
                 continue
 
             parts = line.split(",")
-            name = parts[0]
+            part = parts[0]
+            name = parts[1]
             # zbytek jsou hodnoty – pokusíme se převést na int
-            values = [int(p) for p in parts[1:] if p != ""]
+            values = [int(p) for p in parts[2:] if p != ""]
 
             records.append((name, values))
 

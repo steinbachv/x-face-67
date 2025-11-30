@@ -12,7 +12,7 @@ import joblib
 from compute_features import compute_features
 from load_id import load_indices
 from collections import deque
-
+from check_symetry import check_symetry
 
 
 def put_text_utf8(img, text, position, font_path, font_size, color):
@@ -51,6 +51,7 @@ TARGET_WIDTH = 480
 TARGET_HEIGHT = 640
 # Majority vote buffer (keep last N predictions)
 PRED_HISTORY = deque(maxlen=25)
+SYMMETRY_HISTORY = deque(maxlen=25)
 
 
 def resize_with_aspect(image, target_width, target_height):
@@ -180,7 +181,7 @@ def calculate_metrics(frame, landmarks):
     }
 
 def create_classification_info_panel(predicted_label, confidence, probabilities, label_mapping, 
-                                     target_width, target_height, font_path):
+                                     target_width, target_height, font_path, raw_symmetry_value=None, symetry_ratios=None):
     """
     Create a visualization panel showing classification information.
     
@@ -192,6 +193,8 @@ def create_classification_info_panel(predicted_label, confidence, probabilities,
         target_width: Target width for the panel
         target_height: Target height for the panel
         font_path: Path to font file
+        raw_symmetry_value: Single symmetry metric (0-1) to smooth (last 25 values) and display
+        symetry_ratios: Iterable with six symmetry scores (values 0-1)
         
     Returns:
         numpy array: BGR image of the info panel
@@ -256,6 +259,105 @@ def create_classification_info_panel(predicted_label, confidence, probabilities,
                                  font_path, 14, (255, 255, 255))
             
             y_offset += bar_height + 10
+
+    # --- Symmetry gauge ---
+    raw_value = None
+    if raw_symmetry_value is not None:
+        try:
+            raw_value = float(raw_symmetry_value)
+        except Exception:
+            raw_value = None
+    elif symetry_ratios is not None and len(symetry_ratios) >= 6:
+        try:
+            raw_value = float(np.prod(np.array(symetry_ratios[:6], dtype=float)))
+        except Exception:
+            raw_value = None
+
+    if raw_value is not None:
+        SYMMETRY_HISTORY.append(float(np.clip(raw_value, 0.0, 1.0)))
+
+    smoothed_symmetry = float(np.mean(SYMMETRY_HISTORY)) if len(SYMMETRY_HISTORY) > 0 else None
+
+    gauge_center = (target_width // 2, target_height - 200)
+    gauge_radius = 90
+    gauge_thickness = 18
+    gauge_base_color = (70, 70, 70)
+
+    panel = put_text_utf8(
+        panel,
+        "Míra normálního stavu",
+        (max(gauge_center[0] - 150, 20), gauge_center[1] - gauge_radius - 35),
+        font_path,
+        18,
+        (200, 200, 200),
+    )
+
+    # Draw background ring
+    cv2.circle(panel, gauge_center, gauge_radius, gauge_base_color, gauge_thickness, lineType=cv2.LINE_AA)
+
+    if smoothed_symmetry is not None:
+        symmetry_value = float(np.clip(smoothed_symmetry, 0.0, 1.0))
+        sweep_angle = int(360 * symmetry_value)
+        gauge_color = (
+            0,
+            int(255 * symmetry_value),
+            int(255 * (1.0 - symmetry_value)),
+        )
+        cv2.ellipse(
+            panel,
+            gauge_center,
+            (gauge_radius, gauge_radius),
+            0,
+            -90,
+            -90 + sweep_angle,
+            gauge_color,
+            gauge_thickness,
+            lineType=cv2.LINE_AA,
+        )
+        percent_text = f"{symmetry_value * 100:.0f}%"
+    else:
+        percent_text = "N/A"
+
+    percent_size, _ = cv2.getTextSize(percent_text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)
+    percent_origin = (
+        gauge_center[0] - percent_size[0] // 2,
+        gauge_center[1] + percent_size[1] // 2,
+    )
+    cv2.putText(
+        panel,
+        percent_text,
+        percent_origin,
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.9,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+
+    # --- Placeholder "Vyhodnotit" button ---
+    button_width, button_height = 200, 50
+    button_center_y = gauge_center[1] + gauge_radius + 55
+    top_left = (target_width // 2 - button_width // 2, button_center_y - button_height // 2)
+    bottom_right = (top_left[0] + button_width, top_left[1] + button_height)
+    cv2.rectangle(panel, top_left, bottom_right, (60, 60, 60), -1)
+    cv2.rectangle(panel, top_left, bottom_right, (200, 200, 200), 2)
+
+    btn_text = "Vyhodnotit"
+    btn_size, _ = cv2.getTextSize(btn_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+    btn_origin = (
+        target_width // 2 - btn_size[0] // 2,
+        button_center_y + btn_size[1] // 2 - 2,
+    )
+    cv2.putText(
+        panel,
+        btn_text,
+        btn_origin,
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
     
     return panel
 
@@ -266,6 +368,11 @@ def smooth_label(label):
     PRED_HISTORY.append(label)
     # Return the most common label in recent history
     return max(set(PRED_HISTORY), key=PRED_HISTORY.count)
+
+
+def vyhodnotit_callback():
+    """Placeholder callback for the Vyhodnotit button."""
+    pass
 
 def main():
     # Create output directory if it doesn't exist
@@ -361,7 +468,7 @@ def main():
     current_gif_label = None
     
     # Font path
-    font_path = "/usr/share/fonts/google-droid-sans-fonts/DroidSans.ttf"
+    font_path = "./DroidSans.ttf"
 
     try:
         while True:
@@ -446,12 +553,17 @@ def main():
             predicted_label = None
             confidence = 0.0
             probabilities = None
+            symetry_ratios = None
+            points_normalized = None
             # is_detected = False # Removed per-frame flag
             
             if res.multi_face_landmarks:
                 for face in res.multi_face_landmarks:
                     current_landmarks = face.landmark
                     h, w = processed_frame.shape[:2]
+
+                    # Normalize landmarks for symmetry calculation
+                    normalized_landmarks = normalize_landmarks.normalize_landmarks(face.landmark)
                     
                     # --- CLASSIFICATION ---
                     raw_label, confidence, probabilities = classify_grimace(current_landmarks, svm_model, label_mapping)
@@ -510,16 +622,30 @@ def main():
                             if idx < len(face.landmark):
                                 lm = face.landmark[idx]
                                 points.append((int(lm.x * w), int(lm.y * h)))
-                        
+                                if normalized_landmarks is not None:
+                                    if points_normalized is None:
+                                        points_normalized = []
+                                    points_normalized.append(normalized_landmarks[idx])
                         if len(points) > 1:
                             # Draw lines connecting sequence of points
                             for i in range(len(points) - 1):
                                 cv2.line(processed_frame, points[i], points[i+1], (0, 0, 255), 2)
+                        # --- SYMMETRY CALCULATION ---
+                        if normalized_landmarks is not None and points_normalized:
+                            symetry_ratios = check_symetry(normalized_landmarks, points_normalized)
+            raw_symmetry_value = None
+            if symetry_ratios is not None and len(symetry_ratios) >= 6:
+                try:
+                    raw_symmetry_value = float(np.prod(np.array(symetry_ratios[:6], dtype=float)))
+                except Exception:
+                    raw_symmetry_value = None
 
             # Create classification info panel for third panel
             if predicted_label:
                 img_info = create_classification_info_panel(predicted_label, confidence, probabilities, 
-                                                            label_mapping, TARGET_WIDTH, TARGET_HEIGHT, font_path)
+                                                            label_mapping, TARGET_WIDTH, TARGET_HEIGHT, font_path, 
+                                                            raw_symmetry_value=raw_symmetry_value,
+                                                            symetry_ratios=symetry_ratios)
                 # Ensure it matches the target size
                 if img_info.shape != (TARGET_HEIGHT, TARGET_WIDTH, 3):
                     img_info = resize_with_aspect(img_info, TARGET_WIDTH, TARGET_HEIGHT)
